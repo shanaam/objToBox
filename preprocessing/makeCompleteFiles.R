@@ -23,7 +23,7 @@ library(tidyverse)
 
 ## make into a function
 # setup
-path <- "data/raw"
+path <- "D:/shanaa/repos/unity-reachToTarget-remake/UFile-reachToTarget-remake/data"
 
 for (expVersion in list.files(path = path)){
   try({dir.create(paste(path, "complete", sep = '/'))})
@@ -67,6 +67,14 @@ for (expVersion in list.files(path = path)){
         fwrite(complete_df, file = paste(path, "complete", expVersion, ppt, session, fileName, sep = '/'))
         
       }
+      
+      #copy over the trial results file
+      trialResultPath <- list.files(path = paste(path, expVersion, ppt, session, sep = '/'), 
+                                               pattern = glob2rx("*_results*"), 
+                                               full.names = TRUE) 
+      trialResult <- fread(trialResultPath, stringsAsFactors = FALSE)
+      
+      fwrite(trialResult, file = paste(path, "complete", expVersion, ppt, session, "trial_results.csv", sep = '/'))
     }
   }
 }
