@@ -1,6 +1,6 @@
 ## --------------------------------
 ##
-## Script name: XXX.R
+## Script name: perTrialReachData_2rate.R
 ##
 ## Purpose of script: Use "complete" CSVs to get per trial data
 ##
@@ -21,7 +21,7 @@ library(data.table)
 library(tidyverse)
 
 ## setup
-path <- "data/raw/complete"
+path <- "data/TwoRateVR/complete"
 
 ## functions
 # given a vector, find the euclidian normal (magnitude)
@@ -82,26 +82,26 @@ applyAngDev <- function(trialDFRow, pptAllReaches){
   # important columns
   # 21 = pick up time, 9 = endTime,
   # 23 = distractor_loc, 10 = targetAngle
-  
-  # trialDF
-  pickUpTime <- as.numeric(trialDFRow[21])
-  endTime <- as.numeric(trialDFRow[9])
-  
+
   relevantReach <-
     pptAllReaches %>%
-    filter(time >= pickUpTime, time <= endTime)
+    filter(time >= as.numeric(trialDFRow[8]), time <= as.numeric(trialDFRow[9]))
   
   # find the "correct angle"
-  correctAngle <- as.numeric(trialDFRow[10]) - as.numeric(trialDFRow[23])
+  correctAngle <- as.numeric(trialDFRow[14])
   
   
-  startPoint <- list('x' = relevantReach$pos_x[1], 'y' = relevantReach$pos_y[1], 'z' = relevantReach$pos_z[1])
+  startPoint <- list('x' = as.numeric(trialDFRow[15]), 'y' = as.numeric(trialDFRow[16]), 'z' = as.numeric(trialDFRow[17]))
   
   # find angle 3cm away.
   reachAngle_3cm <- find3cmTheta(relevantReach, startPoint)
   
   # get angular dev
   angular_dev <- reachAngle_3cm - correctAngle
+  
+  # if (as.numeric(trialDFRow[12]) < 0){
+  #   angular_dev <- angular_dev * -1
+  # }
   
   return(angular_dev)
 }
@@ -111,7 +111,7 @@ applyAngDev <- function(trialDFRow, pptAllReaches){
 
 # testing
 
-trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
+# trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
 
 
 # do
@@ -122,7 +122,7 @@ for (expVersion in list.files(path = path)){
     
     for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
       
-      for(trackerTag in c("trackerholder")){
+      for(trackerTag in c("object")){
         
         # make a vector of filenames to load (these are entire paths)       
         fileToLoad <- list.files(path = paste(path, expVersion, ppt, session, sep = '/'), 
@@ -134,23 +134,14 @@ for (expVersion in list.files(path = path)){
         
         trialDF <- fread(paste(path, expVersion, ppt, session, "trial_results.csv", sep = '/'))
         
-        # remove instruction rows
-        trialDF <- filter(trialDF, type != "instruction")
+        #recode angles
+        trialDF$target_angle <- recode(trialDF$target_angle, '40' = '140', '50' = '130', '130' = '50', '140' = '40')
         
         # add an angular dev column to trialDF
         trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
         
         # some basing outlier removal
-        trialDF$theta[trialDF$theta >= 90 | trialDF$theta <= -90] <- NA
-
-        # recode some stuff
-        if (grepl("Sphere", expVersion)){
-          trialDF$obj_shape <- recode(trialDF$obj_shape, sphere = 1, cube = 2)
-        }
-        else{
-          trialDF$obj_shape <- recode(trialDF$obj_shape, cube = 1, sphere = 2)
-          trialDF$theta <- trialDF$theta * -1
-        }
+        trialDF$theta[trialDF$theta >= 60 | trialDF$theta <= -60] <- NA
         
         fwrite(trialDF, file = paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/'))
       }
@@ -161,7 +152,8 @@ for (expVersion in list.files(path = path)){
 
 ## merge into one file
 
-allReachDF <- trialDF[ , c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand")]
+allReachDF_g <- trialDF[ 1:164 , c("trial_num", "block_num", "target_angle","test_to_log", "rotation", "trial_type")]
+allReachDF_g$pert_sched <- "gradual"
 
 for (expVersion in list.files(path = path)){
   
@@ -173,18 +165,79 @@ for (expVersion in list.files(path = path)){
         # read the file
         trialDF_theta <- fread(fileToLoad, stringsAsFactors = FALSE)
         
-        allReachDF <- cbind(allReachDF, ppt = trialDF_theta$theta)
+        version <- trialDF_theta$test_to_log[1]
+        
+        if (version %in% c("A", "B", "C", "D")) { 
+        trialDF_theta <- trialDF_theta %>%
+          filter(block_num <= 4)
+        } else {
+        trialDF_theta <- trialDF_theta %>%
+          filter(block_num >= 5)
+        }
+        
+        rotation <- trialDF_theta$rotation[100]
+        if (rotation < 0){
+          trialDF_theta$theta <- trialDF_theta$theta * -1
+        }
+        
+        allReachDF_g <- cbind(allReachDF_g, ppt = trialDF_theta$theta)
+    }
+  }
+}
+
+
+allReachDF_a <- trialDF[ 1:164 , c("trial_num", "block_num", "target_angle","test_to_log", "rotation", "trial_type")]
+allReachDF_a$pert_sched <- "abrupt"
+
+for (expVersion in list.files(path = path)){
+  
+  for (ppt in list.files(path = paste(path, expVersion, sep = '/'))){
+    
+    for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
+      fileToLoad <- paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/')
+      
+      # read the file
+      trialDF_theta <- fread(fileToLoad, stringsAsFactors = FALSE)
+      
+      version <- trialDF_theta$test_to_log[1]
+      
+      if (version %in% c("A", "B", "C", "D")) { 
+        trialDF_theta <- trialDF_theta %>%
+          filter(block_num >= 5)
+      } else {
+        trialDF_theta <- trialDF_theta %>%
+          filter(block_num <= 4)
+      }
+      
+      rotation <- trialDF_theta$rotation[100]
+      if (rotation < 0){
+        trialDF_theta$theta <- trialDF_theta$theta * -1
+      }
+      
+      
+      allReachDF_a <- cbind(allReachDF_a, ppt = trialDF_theta$theta)
     }
   }
 }
 
 #set column names
-colnames(allReachDF) <- c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand", 1:32)
+colnames(allReachDF_a) <- c("trial_num", "block_num", "target_angle","test_to_log", "rotation", "trial_type", "pert_sched", 1:32)
+colnames(allReachDF_g) <- c("trial_num", "block_num", "target_angle","test_to_log", "rotation", "trial_type", "pert_sched", 1:32)
+
+fwrite(allReachDF_a, file = paste(path, "all_reaches_abrupt.csv", sep = '/'))
+fwrite(allReachDF_g, file = paste(path, "all_reaches_gradual.csv", sep = '/'))
 
 
-allReach_clamped <- filter(allReachDF, type == "clamped")
-allReach_nonClamped <- filter(allReachDF, type != "clamped")
+## test plots
+trial <- 125
+relevantReach <-
+  allReaches %>%
+  filter(time >= as.numeric(trialDF$start_time[trial]), 
+         time <= as.numeric(trialDF$end_time[trial]))
 
-fwrite(allReachDF, file = paste(path, "all_reaches.csv", sep = '/'))
-fwrite(allReach_clamped, file = paste(path, "all_reaches_clamped.csv", sep = '/'))
-fwrite(allReach_nonClamped, file = paste(path, "all_reaches_training.csv", sep = '/'))
+library(plotly)
+
+plot_ly(x = relevantReach$pos_x, y = relevantReach$pos_z, z = relevantReach$pos_y, type = "scatter3d")
+
+
+
