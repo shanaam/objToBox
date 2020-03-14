@@ -1,6 +1,6 @@
 ## --------------------------------
 ##
-## Script name: perTrialReachData_2rate.R
+## Script name: perTrialReachData_dual.R
 ##
 ## Purpose of script: Use "complete" CSVs to get per trial data
 ##
@@ -17,6 +17,7 @@
 ## --------------------------------
 
 ## Load packages
+rm(list = ls())
 library(data.table)
 library(tidyverse)
 
@@ -113,40 +114,40 @@ applyAngDev <- function(trialDFRow, pptAllReaches){
 # testing
 
 # trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
-
-
-# do
-
-for (expVersion in list.files(path = path)){
-  
-  for (ppt in list.files(path = paste(path, expVersion, sep = '/'))){
+## trialResultThetas
+##----
+makeTrialResultThetas <- function(){
+  for (expVersion in list.files(path = path)){
     
-    for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
+    for (ppt in list.files(path = paste(path, expVersion, sep = '/'))){
       
-      for(trackerTag in c("trackerholder")){
+      for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
         
-        # make a vector of filenames to load (these are entire paths)       
-        fileToLoad <- list.files(path = paste(path, expVersion, ppt, session, sep = '/'), 
-                                 pattern = glob2rx(paste("*",trackerTag,"*", sep = "")), 
-                                 full.names = TRUE)
-        
-        # read the file
-        allReaches <- fread(fileToLoad, stringsAsFactors = FALSE)
-        
-        trialDF <- fread(paste(path, expVersion, ppt, session, "trial_results.csv", sep = '/'))
-        
-        # remove instruction trials
-        trialDF <- trialDF %>%
-          filter(type != "instruction")
-        
-        # add an angular dev column to trialDF
-        trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
-        
-        
-        # some basic outlier removal
-        trialDF$theta[trialDF$theta >= 60 | trialDF$theta <= -60] <- NA
-        
-        fwrite(trialDF, file = paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/'))
+        for(trackerTag in c("trackerholder")){
+          
+          # make a vector of filenames to load (these are entire paths)       
+          fileToLoad <- list.files(path = paste(path, expVersion, ppt, session, sep = '/'), 
+                                   pattern = glob2rx(paste("*",trackerTag,"*", sep = "")), 
+                                   full.names = TRUE)
+          
+          # read the file
+          allReaches <- fread(fileToLoad, stringsAsFactors = FALSE)
+          
+          trialDF <- fread(paste(path, expVersion, ppt, session, "trial_results.csv", sep = '/'))
+          
+          # remove instruction trials
+          trialDF <- trialDF %>%
+            filter(type != "instruction")
+          
+          # add an angular dev column to trialDF
+          trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
+          
+          
+          # some basic outlier removal
+          trialDF$theta[trialDF$theta >= 60 | trialDF$theta <= -60] <- NA
+          
+          fwrite(trialDF, file = paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/'))
+        }
       }
     }
   }
@@ -154,51 +155,67 @@ for (expVersion in list.files(path = path)){
 
 
 ## merge into one file
-
-for (expVersion in list.files(path = path)){
-  
-  allReachList <- list()
-  i <- 1
-  
-  for (ppt in list.files(path = paste(path, expVersion, sep = '/'))){
+##----
+makeAllReachesCSV <- function(){
+  for (expVersion in list.dirs(path = path, recursive = FALSE)){
     
-    for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
-        fileToLoad <- paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/')
+    allReachList <- list()
+    i <- 1
+    
+    for (ppt in list.dirs(path = expVersion, recursive = FALSE)){
+      
+      for (session in list.dirs(ppt, recursive = FALSE)){
+          fileToLoad <- paste(session, "trial_results_theta.csv", sep = '/')
+            
+          # read the file
+          trialDF_theta <- fread(fileToLoad, stringsAsFactors = FALSE)
           
-        # read the file
-        trialDF_theta <- fread(fileToLoad, stringsAsFactors = FALSE)
-        
-        # remove instruction trials
-        trialDF_theta <- trialDF_theta %>%
-          filter(type != "instruction")
-        
-        allReachList[[i]] <- trialDF_theta
-        
-        i <- i + 1
+          # remove instruction trials
+          trialDF_theta <- trialDF_theta %>%
+            filter(type != "instruction")
+          
+          allReachList[[i]] <- trialDF_theta
+          
+          i <- i + 1
+      }
     }
+    
+    complete_df <- do.call(rbind, allReachList)
+    
+    # remove unused columns
+    complete_df <- complete_df %>%
+      select(-ends_with("filename"),
+             -starts_with("target_"),
+             -starts_with("loc_"),
+             -plane_setting,
+             -experiment_mode,
+             -directory,
+             -experiment,
+             -session_num,
+             -cursor_rotation)
+    
+    fwrite(complete_df, file = paste(path, "all_reaches.csv", sep = '/'))
+    
   }
-  
-  complete_df <- do.call(rbind, allReachList)
-  
-  
-  
-  fwrite(complete_df, file = paste(path, "/", expVersion, "_all_reaches.csv", sep = ''))
-  
 }
 
-
+## do
+##----
+# makeTrialResultThetas()
+makeAllReachesCSV()
 
 
 ## test plots
-trial <- 125
-relevantReach <-
-  allReaches %>%
-  filter(time >= as.numeric(trialDF$start_time[trial]), 
-         time <= as.numeric(trialDF$end_time[trial]))
-
-library(plotly)
-
-plot_ly(x = relevantReach$pos_x, y = relevantReach$pos_z, z = relevantReach$pos_y, type = "scatter3d")
+##----
+# trial <- 125
+# relevantReach <-
+#   allReaches %>%
+#   filter(time >= as.numeric(trialDF$start_time[trial]), 
+#          time <= as.numeric(trialDF$end_time[trial]))
+# 
+# library(plotly)
+# 
+# plot_ly(x = relevantReach$pos_x, y = relevantReach$pos_z, z = relevantReach$pos_y, type = "scatter3d")
 
 
 
