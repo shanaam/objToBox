@@ -41,7 +41,7 @@ norm_vec <- function(vector){sqrt(crossprod(vector))}
 
 # load data using fread
 loadData <- function(path){
-  data_df <- fread(omnibus_path, stringsAsFactors = TRUE)
+  data_df <- fread(path, stringsAsFactors = TRUE)
   
   return(data_df)
 }

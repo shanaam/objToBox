@@ -161,30 +161,41 @@ for (expVersion in list.files(path = path)){
 
 ## merge into one file
 
-allReachDF <- trialDF[ , c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand")]
+# allReachDF <- trialDF[ , c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand")]
 
-for (expVersion in list.files(path = path)){
+allReachList <- list()
+i <- 1
+
+for (expVersion in list.dirs(path = path, recursive = FALSE)){
   
-  for (ppt in list.files(path = paste(path, expVersion, sep = '/'))){
+  for (ppt in list.dirs(path = expVersion, recursive = FALSE)){
     
-    for (session in list.files(path = paste(path, expVersion, ppt, sep = '/'))){
-        fileToLoad <- paste(path, expVersion, ppt, session, "trial_results_theta.csv", sep = '/')
+    for (session in list.dirs(path = ppt, recursive = FALSE)){
+        fileToLoad <- paste(session, "trial_results_theta.csv", sep = '/')
           
         # read the file
         trialDF_theta <- fread(fileToLoad, stringsAsFactors = FALSE)
         
-        allReachDF <- cbind(allReachDF, ppt = trialDF_theta$theta)
+        # allReachDF <- cbind(allReachDF, ppt = trialDF_theta$theta)
+        allReachList[[i]] <- trialDF_theta
+        
+        i <- i + 1
     }
   }
 }
 
+complete_df <- do.call(rbind, allReachList)
+
+fwrite(complete_df, file = paste(path, "all_reaches.csv", sep = '/'))
+
+
 #set column names
-colnames(allReachDF) <- c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand", 1:32)
+# colnames(allReachDF) <- c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand", 1:32)
 
 
-allReach_clamped <- filter(allReachDF, type == "clamped")
-allReach_nonClamped <- filter(allReachDF, type != "clamped")
-
-fwrite(allReachDF, file = paste(path, "all_reaches.csv", sep = '/'))
-fwrite(allReach_clamped, file = paste(path, "all_reaches_clamped.csv", sep = '/'))
-fwrite(allReach_nonClamped, file = paste(path, "all_reaches_training.csv", sep = '/'))
+# allReach_clamped <- filter(allReachDF, type == "clamped")
+# allReach_nonClamped <- filter(allReachDF, type != "clamped")
+# 
+# fwrite(allReachDF, file = paste(path, "all_reaches.csv", sep = '/'))
+# fwrite(allReach_clamped, file = paste(path, "all_reaches_clamped.csv", sep = '/'))
+# fwrite(allReach_nonClamped, file = paste(path, "all_reaches_training.csv", sep = '/'))

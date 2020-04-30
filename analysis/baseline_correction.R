@@ -73,11 +73,11 @@ apply_dummy <- function(rot_data_row){
   ## Input: ppid, trial_num, type, norm_theta
   if(rot_data_row[3] == "rotated"){
     if(as.numeric(rot_data_row[2]) == 76)
-      return(as.factor(1))
+      return(as.factor("B_1"))
     else if(as.numeric(rot_data_row[2]) <= 79)
-      return(as.factor(2))
+      return(as.factor("B_2"))
     else if(as.numeric(rot_data_row[2]) >= 440 & as.numeric(rot_data_row[2]) <= 442)
-      return(as.factor(3))
+      return(as.factor("B_F"))
     else 
       return(as.factor("N"))
   }
@@ -88,6 +88,23 @@ apply_dummy <- function(rot_data_row){
       return(as.factor("I"))
     else
       return(as.factor("X"))
+  }
+}
+
+apply_dummy_single <- function(rot_data_row){
+  ## Input: ppid, trial_num, type, norm_theta
+  if(rot_data_row[3] == "rotated"){
+    if(as.numeric(rot_data_row[2]) == 139)
+      return(as.factor("B_1"))
+    else if(as.numeric(rot_data_row[2]) <= 142)
+      return(as.factor("B_2"))
+    else if(as.numeric(rot_data_row[2]) >= 316 & as.numeric(rot_data_row[2]) <= 318)
+      return(as.factor("B_F"))
+    else 
+      return(as.factor("N"))
+  }
+  else {
+      return(as.factor("E"))
   }
 }
 
@@ -128,7 +145,7 @@ rot_data <- rot_data %>%
 
 # SAVE HERE
 
-## Make JASPABLE (this doesn't seem to work)
+## Make JASPABLE
 # Add dummies for JASP
 rot_data$dummy <- rot_data %>%
   select(ppid, trial_num, type, norm_theta) %>%
@@ -147,7 +164,7 @@ rot_data_JASP <- rot_data_JASP %>%
   pivot_wider(names_from = dummy, values_from = mean_dev) %>%
   select(-N, -X)
 
-fwrite(rot_data_JASP, file = paste("data/wide_format", "blocked_JASP_broken.csv", sep = '/'))
+# fwrite(rot_data_JASP, file = paste("data/wide_format", "blocked_JASP_broken.csv", sep = '/'))
 
 # make excellable
 # make column data (pivot)
@@ -158,7 +175,7 @@ rot_data_wide_reaches <- rot_data %>%
   pivot_wider(names_from = ppid, values_from = norm_theta)
 
 # SAVE HERE
-fwrite(rot_data_wide_reaches, file = paste("data/wide_format", "reaches.csv", sep = '/'))
+# fwrite(rot_data_wide_reaches, file = paste("data/wide_format", "reaches.csv", sep = '/'))
 
 # do the same for instructed, and non-instructed data
 rot_data_wide_clamped <- rot_data %>%
@@ -167,5 +184,49 @@ rot_data_wide_clamped <- rot_data %>%
   pivot_wider(names_from = ppid, values_from = norm_theta) %>%
   arrange(block_num, obj_shape, trial_num_in_block)
 
-fwrite(rot_data_wide_clamped, file = paste("data/wide_format", "clamped.csv", sep = '/'))
+# fwrite(rot_data_wide_clamped, file = paste("data/wide_format", "clamped.csv", sep = '/'))
+
+dual_data <- rot_data
+dual_data$experiment <- "dual"
+
+single_data <- loadData("data/raw/complete/all_reaches.csv") 
+
+single_data <- single_data %>%
+  filter(hand == "r", block_num >= 16)
+single_data$theta <- single_data$theta * -1 # flip the values to positive
+
+single_data$dummy <- single_data %>%
+  select(ppid, trial_num, type, theta) %>%
+  apply(1, FUN = apply_dummy_single)
+
+single_data$experiment <- "single"
+
+# summarize and merge
+dual_data <- dual_data %>%
+  group_by(experiment, ppid, dummy) %>%
+  summarise(mean_dev = mean(norm_theta, na.rm = TRUE), 
+            sd = sd(norm_theta, na.rm = TRUE), 
+            ci = vector_confint(norm_theta), 
+            n = n(), 
+            median_dev = median(norm_theta, na.rm = TRUE)) 
+
+single_data <- single_data %>%
+  group_by(experiment, ppid, dummy) %>%
+  summarise(mean_dev = mean(theta, na.rm = TRUE), 
+            sd = sd(theta, na.rm = TRUE), 
+            ci = vector_confint(theta), 
+            n = n(), 
+            median_dev = median(theta, na.rm = TRUE)) 
+
+both_data <- rbind(single_data, dual_data)
+
+both_data <- both_data %>%
+  select(experiment, ppid,dummy, mean_dev) %>%
+  pivot_wider(names_from = dummy, values_from = mean_dev) %>%
+  select(-N, -X)
+
+fwrite(both_data, file = paste("data/wide_format", "blocked_JASP_both_exp.csv", sep = '/'))
+
+
+
 
