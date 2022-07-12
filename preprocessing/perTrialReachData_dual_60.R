@@ -78,6 +78,20 @@ find3cmTheta <- function(reachDF, startPoint){
   }
 }
 
+findcmTime <- function(reachDF, startPoint){
+  for(i in 1:nrow(reachDF)) {
+    row <- reachDF[i,]
+    
+    # do stuff with row
+    # if distance of the row (minus home) is greather than 1cm...
+    if (DistanceFromHome(row, startPoint) >= 0.01){
+      # get time from the row
+      eventTime <- as.numeric(row[1, 1])
+      
+      return(eventTime)
+    }
+  }
+}
 
 applyAngDev <- function(trialDFRow, pptAllReaches){
   # important columns
@@ -108,9 +122,78 @@ applyAngDev <- function(trialDFRow, pptAllReaches){
   return(angular_dev)
 }
 
+#This should be the point at which the hand crosses a certain threshold for each trial
+applyStartRT <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[8]) + 0.015, time <= as.numeric(trialDFRow[21]))
+  # the +0.015 removes the first frame where the obj tracker is at 0,0,0
+  
+  # the starting position (dock)
+  startPoint <- list('x' = as.numeric(relevantReach$pos_x[1]), 
+                     'y' = as.numeric(relevantReach$pos_y[1]), 
+                     'z' = as.numeric(relevantReach$pos_z[1]))
+  
+  # find time at 1cm away.
+  time_cm <- findcmTime(relevantReach, startPoint)
+  
+  # get the relative time
+  startRT <- time_cm - as.numeric(as.numeric(relevantReach$time[1]))
 
+  return(startRT)
+}
 
+applyStepRT <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[21]), time <= as.numeric(trialDFRow[9]))
+  
+  # the starting position (dock)
+  startPoint <- list('x' = as.numeric(relevantReach$pos_x[1]), 
+                     'y' = as.numeric(relevantReach$pos_y[1]), 
+                     'z' = as.numeric(relevantReach$pos_z[1]))
+  
+  # find time at 1cm away.
+  time_cm <- findcmTime(relevantReach, startPoint)
+  
+  # get the relative time
+  stepRT <- time_cm - as.numeric(as.numeric(relevantReach$time[1]))
+  
+  return(stepRT)
+}
 
+applyPathLength <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[21]), time <= as.numeric(trialDFRow[9]))
+  
+  #make sure we start with a fresh pathLength
+  pathLength <- 0
+  
+  #iterate over rows, starting at second
+  for (i in 2:nrow(relevantReach)){
+    
+    # add the small distance to pathlength
+    pathLength = pathLength + NormVec(c(as.numeric(relevantReach[i, 2]), as.numeric(relevantReach[i, 3]), as.numeric(relevantReach[i, 4])) - c(as.numeric(relevantReach[i-1, 2]), as.numeric(relevantReach[i-1, 3]), as.numeric(relevantReach[i-1, 4])))
+  }
+  
+  return(pathLength)
+}
 # testing
 
 # trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
@@ -142,6 +225,14 @@ makeTrialResultThetas <- function(){
           # add an angular dev column to trialDF
           trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
           
+          # add a start reaction time (startRT) column to trialDF
+          trialDF$startRT <- apply(trialDF, MARGIN = 1, applyStartRT, pptAllReaches = allReaches)
+          
+          # add a step reaction time (startRT) column to trialDF
+          trialDF$stepRT <- apply(trialDF, MARGIN = 1, applyStepRT, pptAllReaches = allReaches)
+          
+          # add a path length column to trialDF
+          # trialDF$pathLength <- apply(trialDF, MARGIN = 1, applyPathLength, pptAllReaches = allReaches)
           
           # some basic outlier removal
           trialDF$theta[trialDF$theta >= 120 | trialDF$theta <= -120] <- NA
@@ -203,21 +294,30 @@ makeAllReachesCSV <- function(){
 
 ## do
 ##----
-# makeTrialResultThetas()
+makeTrialResultThetas()
 makeAllReachesCSV()
 
 
 ## test plots
 ##----
-# trial <- 125
-# relevantReach <-
-#   allReaches %>%
-#   filter(time >= as.numeric(trialDF$start_time[trial]), 
-#          time <= as.numeric(trialDF$end_time[trial]))
+
+
+# ppt <- 1
+# expVersion <- "A"
 # 
-# library(plotly)
+# # make a vector of filenames to load (these are entire paths)       
+# fileToLoad <- list.files(path = paste(path, expVersion, ppt, session, sep = '/'), 
+#                          pattern = glob2rx(paste("*",trackerTag,"*", sep = "")), 
+#                          full.names = TRUE)
 # 
-# plot_ly(x = relevantReach$pos_x, y = relevantReach$pos_z, z = relevantReach$pos_y, type = "scatter3d")
-
-
-
+# # read the file
+# allReaches <- fread(fileToLoad, stringsAsFactors = FALSE)
+# trialDF <- fread(paste(path, expVersion, ppt, session, "trial_results.csv", sep = '/'))
+# 
+# # remove instruction trials
+# trialDF <- trialDF %>%
+#   filter(type != "instruction")
+# 
+# pptAllReaches = allReaches
+# 
+# trialDFRow <- as.numeric(trialDF[1,])

@@ -39,6 +39,18 @@ vector_confint <- function(vector, interval = 0.95) {
 # get the magnitude (euclidian normal) of a vector (this is faster than R's built in norm)
 norm_vec <- function(vector){sqrt(crossprod(vector))}
 
+apply_reachDF_norm_vec <- function(df) {
+  #ignore the y to get distance on plane
+  vector <- c(as.numeric(df[2]), as.numeric(df[4]))
+  sqrt(crossprod(vector))
+}
+
+apply_relative_pos <- function(dfRow, homePos)
+  return (c(dfRow[2] - homePos[1], dfRow[3] - homePos[2], dfRow[4] - homePos[3]))
+
+apply_subtraction <- function(value, homePos)
+  return (round(value - homePos, digits = 5))
+
 # load data using fread
 loadData <- function(path){
   data_df <- fread(path, stringsAsFactors = TRUE)

@@ -17,6 +17,7 @@
 ## --------------------------------
 
 ## Load packages
+rm(list = ls())
 library(data.table)
 library(tidyverse)
 
@@ -77,6 +78,21 @@ find3cmTheta <- function(reachDF, startPoint){
   }
 }
 
+findcmTime <- function(reachDF, startPoint){
+  for(i in 1:nrow(reachDF)) {
+    row <- reachDF[i,]
+    
+    # do stuff with row
+    # if distance of the row (minus home) is greather than 1cm...
+    if (DistanceFromHome(row, startPoint) >= 0.01){
+      # get time from the row
+      eventTime <- as.numeric(row[1, 1])
+      
+      return(eventTime)
+    }
+  }
+}
+
 
 applyAngDev <- function(trialDFRow, pptAllReaches){
   # important columns
@@ -106,13 +122,87 @@ applyAngDev <- function(trialDFRow, pptAllReaches){
   return(angular_dev)
 }
 
+applyStartRT <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[8]) + 0.015, time <= as.numeric(trialDFRow[21]))
+  # the +0.015 removes the first frame where the obj tracker is at 0,0,0
+  
+  # the starting position (dock)
+  startPoint <- list('x' = as.numeric(relevantReach$pos_x[1]), 
+                     'y' = as.numeric(relevantReach$pos_y[1]), 
+                     'z' = as.numeric(relevantReach$pos_z[1]))
+  
+  # find time at 1cm away.
+  time_cm <- findcmTime(relevantReach, startPoint)
+  
+  # get the relative time
+  startRT <- time_cm - as.numeric(as.numeric(relevantReach$time[1]))
+  
+  return(startRT)
+}
 
+applyStepRT <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[21]), time <= as.numeric(trialDFRow[9]))
+  
+  # the starting position (dock)
+  startPoint <- list('x' = as.numeric(relevantReach$pos_x[1]), 
+                     'y' = as.numeric(relevantReach$pos_y[1]), 
+                     'z' = as.numeric(relevantReach$pos_z[1]))
+  
+  # find time at 1cm away.
+  time_cm <- findcmTime(relevantReach, startPoint)
+  
+  # get the relative time
+  stepRT <- time_cm - as.numeric(as.numeric(relevantReach$time[1]))
+  
+  return(stepRT)
+}
 
+# apply a path length
+applyPathLength <- function(trialDFRow, pptAllReaches){
+  # important columns
+  # 8 = startTime, 21 = stepTime, 9 = endTime
+  # 18, 19, 20 = dock x, y, z
+  # 23 = distractor_loc, 10 = targetAngle
+  
+  relevantReach <-
+    pptAllReaches %>%
+    filter(time >= as.numeric(trialDFRow[21]), time <= as.numeric(trialDFRow[9]))
 
-# testing
-
-trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
-
+  #make sure we start with a fresh pathLength
+  pathLength <- 0
+  
+  #iterate over rows, starting at second
+  for (i in 2:nrow(relevantReach)){
+    point1 <- c(as.numeric(relevantReach[i-1, 2]), 
+                as.numeric(relevantReach[i-1, 3]), 
+                as.numeric(relevantReach[i-1, 4]))
+    point2 <- c(as.numeric(relevantReach[i, 2]), 
+                as.numeric(relevantReach[i, 3]), 
+                as.numeric(relevantReach[i, 4]))
+    mini_vector <- point2 - point1
+    
+    mini_distance <- NormVec(mini_vector)
+    
+    # add the small distance to pathlength
+    pathLength = pathLength + mini_distance
+  }
+  
+  return(pathLength)
+}
 
 # do
 
@@ -140,6 +230,17 @@ for (expVersion in list.files(path = path)){
         # add an angular dev column to trialDF
         trialDF$theta <- apply(trialDF, MARGIN = 1, applyAngDev, pptAllReaches = allReaches)
         
+        # add a start reaction time (startRT) column to trialDF
+        trialDF$startRT <- apply(trialDF, MARGIN = 1, applyStartRT, pptAllReaches = allReaches)
+        
+        # add a step reaction time (startRT) column to trialDF
+        trialDF$stepRT <- apply(trialDF, MARGIN = 1, applyStepRT, pptAllReaches = allReaches)
+        
+        # add a path length column to trialDF
+        # trialDF$pathLength <- apply(trialDF, MARGIN = 1, applyPathLength, pptAllReaches = allReaches)
+        
+        
+        
         # some basing outlier removal
         trialDF$theta[trialDF$theta >= 90 | trialDF$theta <= -90] <- NA
 
@@ -159,7 +260,7 @@ for (expVersion in list.files(path = path)){
 }
 
 
-## merge into one file
+#### merge into one file
 
 # allReachDF <- trialDF[ , c("trial_num", "block_num", "targetAngle", "type", "obj_shape", "hand")]
 
