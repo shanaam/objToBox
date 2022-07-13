@@ -24,7 +24,7 @@ library(tidyverse)
 ## make into a function
 # setup
 # path <- "D:/shanaa/repos/unity-reachToTarget-remake/UFile-reachToTarget-remake/data"
-path <- "data/moveObject_dual"
+path <- "data/raw/moveObject_dual"
 
 for (expVersion in list.files(path = path)){
   try({dir.create(paste(path, "complete", sep = '/'))})

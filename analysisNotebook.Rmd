@@ -1,0 +1,30 @@
+---
+title: "Unbounded Implicit Learning - Analysis"
+author: "Shanaa Modchalingam"
+date: '2022-04-04'
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+rm(list = ls())      # clean environment
+
+source("src/helper_funcs.R")
+library(data.table)
+library(tidyverse)
+library(ggbeeswarm)
+library(ez) #for ANOVAs
+library(effectsize) # for eta-squared
+library(BayesFactor)
+library(bayestestR)
+
+```
+
+# Demographic information
+
+30-degree group: 32 ppts, 
