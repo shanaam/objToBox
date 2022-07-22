@@ -12,19 +12,313 @@ output:
 ---
 
 ```{r setup, include=FALSE, warning=FALSE}
-rm(list = ls())      # clean environment
+rm(list = ls()) # clean environment
 
 source("src/helper_funcs.R")
 library(data.table)
 library(tidyverse)
 library(ggbeeswarm)
-library(ez) #for ANOVAs
+library(ggstatsplot)
+library(ez) # for ANOVAs
 library(effectsize) # for eta-squared
 library(BayesFactor)
 library(bayestestR)
+```
 
+```{r}
+# Load data
+data_path <- "data/bl_corrected/bl_corrected_data.csv"
+
+bl_corrected_df <- read_delim(data_path,
+  delim = ",",
+  col_types = cols(
+    .default = col_double(),
+    ppid = col_factor(),
+    targetAngle = col_factor(),
+    type = col_factor(),
+    hand = col_factor(),
+    obj_shape = col_factor(),
+    distractor_loc = col_factor(),
+    exp = col_factor()
+  )
+)
 ```
 
 # Demographic information
 
 30-degree group: 32 ppts, 
+
+# Basic plots
+
+### Single group
+```{r, echo=FALSE}
+# isolate the single group
+data <- bl_corrected_df %>% filter(exp == "single")
+
+# make group means
+data_group <- data %>%
+  group_by(trial_num) %>%
+  summarise(
+    mean_angular_dev = mean(angular_dev, na.rm = TRUE),
+    ci = vector_confint(angular_dev),
+    n = n()
+  )
+
+# set up the plot
+p <- data %>%
+  ggplot(aes(x = trial_num, y = angular_dev)) +
+  theme_classic()
+
+# add the scatter plot
+p <- p + geom_point(
+  aes(
+    color = targetAngle
+  ),
+  alpha = 0.1
+)
+
+# add the line plot
+p <- p + geom_line(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+  ),
+  size = 1
+)
+
+# add the confidence interval using ribbon
+p <- p + geom_ribbon(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+    ymin = mean_angular_dev - ci,
+    ymax = mean_angular_dev + ci
+  ),
+  alpha = 0.1
+)
+
+# limit y-axis to [-80, 70]
+p <- p + ylim(-50, 30)
+
+# show the plot
+p
+```
+### Dual group
+```{r, echo=FALSE}
+# isolate the dual group
+data <- bl_corrected_df %>% filter(exp == "dual")
+
+# make group means
+data_group <- data %>%
+  group_by(trial_num, obj_shape) %>%
+  summarise(
+    mean_angular_dev = mean(angular_dev, na.rm = TRUE),
+    ci = vector_confint(angular_dev),
+    n = n()
+  )
+
+# set up the plot
+p <- data %>%
+  ggplot(aes(
+    x = trial_num, y = angular_dev,
+    colour = obj_shape, fill = obj_shape
+  )) +
+  theme_classic()
+
+# add the scatter plot
+p <- p + geom_point(
+  alpha = 0.1
+)
+
+# add the line plot
+p <- p + geom_line(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+  ),
+  size = 1
+)
+
+# add the confidence interval using ribbon
+p <- p + geom_ribbon(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+    ymin = mean_angular_dev - ci,
+    ymax = mean_angular_dev + ci
+  ),
+  colour = NA,
+  alpha = 0.5
+)
+
+# limit y-axis to [-80, 70]
+p <- p + ylim(-50, 30)
+
+# show the plot
+p
+```
+### Dual 60-degree group
+```{r, echo=FALSE}
+# isolate the dual group
+data <- bl_corrected_df %>% filter(exp == "dual_60")
+
+# make group means
+data_group <- data %>%
+  group_by(trial_num, obj_shape) %>%
+  summarise(
+    mean_angular_dev = mean(angular_dev, na.rm = TRUE),
+    ci = vector_confint(angular_dev),
+    n = n()
+  )
+
+# set up the plot
+p <- data %>%
+  ggplot(aes(
+    x = trial_num, y = angular_dev,
+    colour = obj_shape, fill = obj_shape
+  )) +
+  theme_classic()
+
+# add the scatter plot
+p <- p + geom_point(
+  alpha = 0.1
+)
+
+# add the line plot
+p <- p + geom_line(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+  ),
+  size = 1
+)
+
+# add the confidence interval using ribbon
+p <- p + geom_ribbon(
+  data = data_group,
+  aes(
+    y = mean_angular_dev,
+    ymin = mean_angular_dev - ci,
+    ymax = mean_angular_dev + ci
+  ),
+  colour = NA,
+  alpha = 0.5
+)
+
+# limit y-axis to [-80, 70]
+p <- p + ylim(-50, 30)
+
+# show the plot
+p
+```
+
+### Path lenghts
+```{r, echo=FALSE}
+# exclude the dual group
+data <- bl_corrected_df %>% filter(exp != "dual_60") %>%
+  filter(block_num == 7 | block_num == 16)
+
+# make group means
+data_group <- data %>%
+  group_by(exp, trial_num, trial_num_in_block) %>%
+  summarise(
+    mean_pl = mean(pathLength, na.rm = TRUE),
+    ci = vector_confint(pathLength),
+    n = n()
+  )
+
+# set up the plot
+p <- data %>%
+  ggplot(aes(
+    x = trial_num_in_block, y = pathLength,
+    colour = exp, fill = exp
+  )) +
+  theme_classic()
+
+# add the scatter plot
+p <- p + geom_point(
+  alpha = 0.1
+)
+
+# add the line plot
+p <- p + geom_line(
+  data = data_group,
+  aes(
+    y = mean_pl,
+  ),
+  size = 1
+)
+
+# add the confidence interval using ribbon
+p <- p + geom_ribbon(
+  data = data_group,
+  aes(
+    y = mean_pl,
+    ymin = mean_pl - ci,
+    ymax = mean_pl + ci
+  ),
+  colour = NA,
+  alpha = 0.5
+)
+
+# limit y-axis to [-80, 70]
+p <- p + ylim(0.1, 0.3)
+# show the plot
+p
+```
+```{r, echo=FALSE}
+# exclude the dual group
+data <- bl_corrected_df %>% filter(exp != "dual_60")
+
+# make group means
+data_group <- data %>%
+  group_by(exp, trial_num, trial_num_in_block) %>%
+  summarise(
+    mean_pl = mean(pathLength, na.rm = TRUE),
+    ci = vector_confint(pathLength),
+    n = n()
+  )
+
+# set up the plot
+p <- data %>%
+  ggplot(aes(
+    x = trial_num, y = pathLength,
+    colour = exp, fill = exp
+  )) +
+  theme_classic()
+
+# add the scatter plot
+p <- p + geom_point(
+  alpha = 0.1
+)
+
+# add the line plot
+p <- p + geom_line(
+  data = data_group,
+  aes(
+    y = mean_pl,
+  ),
+  size = 1
+)
+
+# add the confidence interval using ribbon
+p <- p + geom_ribbon(
+  data = data_group,
+  aes(
+    y = mean_pl,
+    ymin = mean_pl - ci,
+    ymax = mean_pl + ci
+  ),
+  colour = NA,
+  alpha = 0.2
+)
+
+# limit y-axis to [-80, 70]
+p <- p + ylim(0.1, 0.3)
+# show the plot
+p
+```
+```{r, echo=FALSE}
+NULL
+```
+

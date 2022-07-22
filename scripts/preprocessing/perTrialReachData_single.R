@@ -30,15 +30,23 @@ NormVec <- function(vec) sqrt(sum(vec^2))
 
 # given a row of data (as a df), returns a vector with x,y,z positions that are adjusted for hompePosition
 PositionVec <- function(dfRow, homePositionLoc) {
-  return(c(dfRow$pos_x - homePositionLoc$x, dfRow$pos_y - homePositionLoc$y, dfRow$pos_z - homePositionLoc$z))
+  return(c(
+    dfRow$pos_x - homePositionLoc$x,
+    dfRow$pos_y - homePositionLoc$y,
+    dfRow$pos_z - homePositionLoc$z
+  ))
 }
 
 # given a 3-D vector, find spherical (magnitude, theta, phi)
 SphericalVec <- function(vec) {
   magnitude <- NormVec(vec)
 
-  # theta <- acos(vec[1] / magnitude) * 180/pi                # the 180/pi is to turn radians to degrees
-  theta <- (atan2(vec[3], vec[1]) * 180 / pi) %% 360 # abs is a bad way to do it because sometimes, the direction is negative... This is a problem with the coordinate frames unity uses vs what I am expecting. Work out the math on paper
+  # (theta <- acos(vec[1] / magnitude) * 180/pi)
+  # the 180/pi is to turn radians to degrees
+  theta <- (atan2(vec[3], vec[1]) * 180 / pi) %% 360
+  # abs is a bad way to do it because sometimes, the direction is negative...
+  # This is a problem with the coordinate frames unity uses vs what I am expecting.
+  # Work out the math on paper
 
   # phi <- acos(vec[1] / NormVec(vec[1:2])) * 180/pi
   phi <- acos(vec[2] / magnitude) * 180 / pi
@@ -112,7 +120,11 @@ applyAngDev <- function(trialDFRow, pptAllReaches) {
   correctAngle <- as.numeric(trialDFRow[10]) - as.numeric(trialDFRow[23])
 
 
-  startPoint <- list("x" = relevantReach$pos_x[1], "y" = relevantReach$pos_y[1], "z" = relevantReach$pos_z[1])
+  startPoint <- list(
+    "x" = relevantReach$pos_x[1],
+    "y" = relevantReach$pos_y[1],
+    "z" = relevantReach$pos_z[1]
+  )
 
   # find angle 3cm away.
   reachAngle_3cm <- find3cmTheta(relevantReach, startPoint)
@@ -131,7 +143,10 @@ applyStartRT <- function(trialDFRow, pptAllReaches) {
 
   relevantReach <-
     pptAllReaches %>%
-    filter(time >= as.numeric(trialDFRow[8]) + 0.015, time <= as.numeric(trialDFRow[21]))
+    filter(
+      time >= as.numeric(trialDFRow[8]) + 0.015,
+      time <= as.numeric(trialDFRow[21])
+    )
   # the +0.015 removes the first frame where the obj tracker is at 0,0,0
 
   # the starting position (dock)
@@ -335,7 +350,7 @@ complete_df <- complete_df %>%
 
 # rename cursor_rotation to dual_rotation
 complete_df <- complete_df %>%
-  rename(dual_rotation = cursor_rotation, step_time = pick_up_time) 
+  rename(dual_rotation = cursor_rotation, step_time = pick_up_time)
 
 fwrite(complete_df, file = paste(path, "all_reaches.csv", sep = "/"))
 

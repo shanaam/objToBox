@@ -32,7 +32,7 @@ library(tidyverse)
 ## ----
 ## Functions
 # function for making the omnibus thing
-makeNoCurOmnibus <- function() {
+make_obj_to_box_omnibus <- function() {
     path <- "data/omnibus/"
     datalist <- list()
     i <- 1
@@ -47,7 +47,10 @@ makeNoCurOmnibus <- function() {
     # load and concatenate all the files listed in all_reaches_csvs
     for (file in all_reaches_csvs) {
         datalist[[i]] <- read.csv(file) %>%
-            mutate(exp = gsub("_pl.csv", "", gsub("data/omnibus/all_reaches_", "", file)))
+            mutate(exp = gsub(
+                "_pl.csv", "",
+                gsub("data/omnibus/all_reaches_", "", file)
+            ))
 
         i <- i + 1
     }
@@ -59,4 +62,4 @@ makeNoCurOmnibus <- function() {
     fwrite(omnibus_obj_to_box, file = "data/omnibus/omnibus_obj_to_box.csv")
 }
 
-makeNoCurOmnibus()
+make_obj_to_box_omnibus()
